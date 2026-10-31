@@ -1,0 +1,262 @@
+import { chromium } from 'playwright-core';
+import { mkdirSync } from 'node:fs';
+
+const URL = 'http://localhost:5174/';
+const OUT = new globalThis.URL('./after/', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
+mkdirSync(OUT, { recursive: true });
+const KEY = 'acl-course-pulse-v2';
+
+const browser = await chromium.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true });
+let pass = 0, fail = 0; const errors = [];
+const check = (name, ok, extra = '') => { ok ? pass++ : fail++; console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${extra !== '' ? '  -> ' + JSON.stringify(extra) : ''}`); };
+const fresh = async (viewport = { width: 1440, height: 900 }) => {
+  const ctx = await browser.newContext({ viewport });
+  const page = await ctx.newPage();
+  page.on('pageerror', e => errors.push(e.message));
+  page.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errors.push(m.text()); });
+  page.dialogAnswer = true; page.dialogs = [];
+  page.on('dialog', d => { page.dialogs.push(d.message()); page.dialogAnswer ? d.accept() : d.dismiss(); });
+  await page.goto(URL); await page.waitForSelector('.page-head');
+  return page;
+};
+const shot = (p, n, fullPage = false) => p.screenshot({ path: `${OUT}${n}.png`, fullPage });
+const settle = p => p.waitForTimeout(800);
+const saved = p => p.evaluate(k => JSON.parse(localStorage.getItem(k)), KEY);
+const search = p => p.locator('input[aria-label="Search reviews"]');
+const commentRows = p => p.locator('tbody td.commentcell').count();
+const mInput = p => p.locator('.modal input');
+const mSelect = p => p.locator('.modal select');
+const mText = p => p.locator('.modal textarea');
+const mSubmit = p => p.locator('.modal button[type=submit]');
+const writeBtn = p => p.locator('.page-head .post-review');
+
+// ===== Issue 1: choosing a course
+let p = await fresh();
+await shot(p, '01-landing-fold'); await shot(p, '02-landing-full', true);
+check('I1 all 5 catalog courses listed', await p.locator('.course-card').count() === 5);
+check('I1 cards visible without scrolling', await p.locator('.course-card').last().evaluate(e => e.getBoundingClientRect().bottom <= innerHeight));
+const firstRow = await p.locator('tbody tr').first().evaluate(e => Math.round(e.getBoundingClientRect().top));
+console.log('      first review row top (was 877):', firstRow);
+check('I1 card shows name/avg/count', /MATH204[\s\S]*Linear Algebra[\s\S]*4\.0[\s\S]*2 reviews/.test(await p.locator('.course-card', { hasText: 'MATH204' }).innerText()));
+check('I1 marks courses you reviewed', await p.locator('.course-card', { hasText: 'CSEN701' }).locator('em').count() === 1 && await p.locator('.course-card', { hasText: 'MATH204' }).locator('em').count() === 0);
+await search(p).fill('Linear Algebra');
+check('I1 search by course name (was 0)', await commentRows(p) === 2);
+await search(p).fill('details');
+check('I1 search ignores fallback name text', await commentRows(p) === 0);
+await search(p).fill('');
+await p.locator('.summary input').fill('Linear Algebra');
+check('I1 lookup by name (was —)', /4\.0/.test(await p.locator('.score').innerText()));
+await p.locator('.lookup-course-link').click(); await p.waitForSelector('.course-hero');
+check('I1 lookup opens resolved course', p.url().endsWith('#/courses/MATH204'));
+await p.locator('.back-to-reviews').click(); await settle(p);
+await p.locator('.course-card', { hasText: 'HUMA101' }).click(); await p.waitForSelector('.course-hero');
+check('I1 card opens course page', p.url().endsWith('#/courses/HUMA101'));
+
+// ===== Issue 2: trustworthy list
+p = await fresh();
+const dates = await p.locator('tbody tr td:nth-child(5)').allInnerTexts();
+check('I2 real dates, not Recently', dates.length === 9 && !dates.includes('Recently') && dates[0] === '6 Oct 2026', dates[0]);
+await p.getByRole('button', { name: 'Your reviews' }).click(); await settle(p);
+const owners = await p.locator('tbody tr td:nth-child(4)').allInnerTexts();
+check('I2 Your reviews = only yours (was 4 with 2 others)', owners.length === 2 && owners.every(o => o === 'You'), owners);
+check('I2 filter chip visible', await p.locator('.filter-chip').count() === 1);
+check('I2 search box not polluted', await search(p).inputValue() === '');
+await shot(p, '03-your-reviews-filter');
+await p.getByRole('button', { name: 'Show reviews from everyone' }).click();
+check('I2 chip removal restores all', await commentRows(p) === 9);
+await p.getByRole('button', { name: 'Your reviews' }).click(); await settle(p);
+await p.getByRole('button', { name: 'Browse reviews' }).click(); await settle(p);
+check('I2 Browse clears owner filter (was sticky)', await commentRows(p) === 9);
+check('I2 Apply removed, filtering live', await p.locator('.searchbar > button').count() === 0);
+await p.locator('.searchbar select').selectOption('5');
+check('I2 rating filter live', await commentRows(p) === 3);
+await search(p).fill('zzz');
+check('I2 empty state offers clear', await p.getByRole('cell', { name: /No reviews match/ }).count() === 1);
+await shot(p, '04-empty-filter-state');
+await p.getByRole('cell', { name: /No reviews match/ }).getByRole('button', { name: 'Clear filters' }).click();
+check('I2 clear filters', await commentRows(p) === 9 && await search(p).inputValue() === '');
+await search(p).fill('Karim');
+await p.locator('.course-link', { hasText: 'MATH204' }).first().click(); await p.waitForSelector('.course-hero'); await settle(p);
+check('I2 course page rating breakdown', await p.locator('.course-feedback .rating-row').count() === 5);
+check('I2 course page real date', /\d{4}/.test(await p.locator('.course-review-meta').first().innerText()));
+await shot(p, '05-course-page');
+await p.locator('.back-to-reviews').click(); await settle(p); await settle(p);
+const listTop = await p.locator('#review-list').evaluate(e => Math.round(e.getBoundingClientRect().top));
+check('I2 Back lands on list (was 721px down)', Math.abs(listTop) < 5, listTop);
+check('I2 filters survive Back', await search(p).inputValue() === 'Karim');
+await search(p).fill('');
+await p.locator('.course-link', { hasText: 'MATH204' }).first().click(); await p.waitForSelector('.course-hero');
+await p.getByRole('button', { name: 'Overview' }).click(); await settle(p);
+check('Overview from course goes to top', await p.evaluate(() => scrollY) < 5);
+await p.goBack(); await p.waitForSelector('.course-hero');
+check('browser Back returns to course', p.url().endsWith('#/courses/MATH204'));
+await p.goForward(); await p.waitForSelector('.page-head');
+
+// ===== Issue 3: submitting
+p = await fresh();
+await writeBtn(p).click(); await p.waitForSelector('.modal');
+check('I3 focus starts on course field', await p.evaluate(() => document.activeElement.tagName) === 'INPUT');
+await mInput(p).fill('CSEN 701');
+check('I3 duplicate warned live (space variant)', /already reviewed CSEN701/.test(await p.locator('.course-status').innerText()));
+await mSelect(p).selectOption('4');
+await mSubmit(p).click();
+check('I3 "CSEN 701" blocked (was saved)', await p.locator('.formerror').innerText() === 'You have already reviewed this course.');
+await settle(p); await shot(p, '06-unsuccessful-duplicate');
+check('I3 nothing saved on failure', (await saved(p)).length === 9);
+await mInput(p).fill('csen701');
+check('I3 error clears on edit', await p.locator('.formerror').count() === 0);
+p.dialogAnswer = false;
+await p.locator('.status-warning button').click();
+check('I3 switching with a draft asks first', p.dialogs.length === 1 && await mInput(p).inputValue() === 'csen701');
+p.dialogAnswer = true;
+await p.locator('.status-warning button').click();
+check('I3 switch opens your review', await p.locator('.modal h2').innerText() === 'Edit review' && await mText(p).inputValue() === 'A challenging team project. The weekly milestones helped.');
+await p.keyboard.press('Escape'); await p.waitForTimeout(100);
+check('I3 Esc closes clean form with no prompt', await p.locator('.modal').count() === 0 && p.dialogs.length === 2);
+
+await writeBtn(p).click();
+await mInput(p).fill('critical');
+check('I3 partial name suggests course', /Critical Thinking & Communication \(HUMA101\)/.test(await p.locator('.course-status').innerText()));
+await settle(p); await shot(p, '07-did-you-mean');
+await p.locator('.suggestion').click();
+check('I3 suggestion fills code', await mInput(p).inputValue() === 'HUMA101');
+await p.waitForTimeout(100);
+check('I3 focus stays in dialog after suggestion', await p.evaluate(() => document.activeElement.tagName) === 'SELECT');
+await p.locator('.modal-title h2').click();
+await p.keyboard.press('Tab');
+check('I3 Tab from blank dialog area stays in dialog', await p.evaluate(() => !!document.activeElement.closest('.modal')));
+check('I3 resolved confirmation', /✓ Critical Thinking & Communication \(HUMA101\)/.test(await p.locator('.course-status').innerText()));
+await mInput(p).fill('Data Structures');
+check('I3 full name resolves', /✓ Data Structures \(CSEN202\)/.test(await p.locator('.course-status').innerText()));
+await mText(p).fill('Clear, well-paced assignments.');
+p.dialogAnswer = false;
+await p.mouse.click(10, 10); await p.waitForTimeout(100);
+check('I3 draft preserved when discard refused', await mText(p).inputValue() === 'Clear, well-paced assignments.');
+p.dialogAnswer = true;
+await mSelect(p).selectOption('5');
+await settle(p); await shot(p, '08-modal-resolved');
+await mSubmit(p).click(); await p.waitForTimeout(150);
+let s = await saved(p);
+check('MAIN create saves canonical code', s[0].courseCode === 'CSEN202' && s[0].rating === 5 && s[0].owner === 'you' && s[0].name === 'You' && s[0].comment === 'Clear, well-paced assignments.');
+check('MAIN confirmation names course', /Review posted for CSEN202/.test(await p.locator('.notice').innerText()));
+await shot(p, '09-main-action-posted');
+check('MAIN table updated', /CSEN202/.test(await p.locator('tbody tr').first().innerText()));
+check('MAIN card updated', /2 reviews/.test(await p.locator('.course-card', { hasText: 'CSEN202' }).innerText()));
+await p.locator('.notice .row-edit').click(); await p.waitForSelector('.course-hero');
+check('MAIN notice links to course', p.url().endsWith('#/courses/CSEN202'));
+check('stale notice cleared on navigation', await p.locator('.notice').count() === 0);
+
+// Course page entry points
+await p.goto(URL + '#/courses/MATH204'); await p.waitForSelector('.course-hero');
+await p.locator('.course-feedback .post-review').click();
+check('I3 course button prefills', await mInput(p).inputValue() === 'MATH204');
+check('I3 focus skips to rating when prefilled', await p.evaluate(() => document.activeElement.tagName) === 'SELECT');
+check('I3 prefill alone is not a dirty draft', (await p.keyboard.press('Escape'), await p.waitForTimeout(100), await p.locator('.modal').count()) === 0);
+await p.getByRole('button', { name: 'Write a review' }).click();
+check('I3 sidebar blank for another course', await mInput(p).inputValue() === '');
+await p.keyboard.press('Escape'); await p.waitForTimeout(100);
+await p.locator('.course-feedback .post-review').click();
+await mSelect(p).selectOption('4');
+await mSubmit(p).click(); await p.waitForTimeout(150);
+check('I3 confirmation on course page (was 0)', /Review posted for MATH204/.test(await p.locator('.notice').innerText()));
+check('course page updates live', /3 review/.test(await p.locator('.course-mini-score span').innerText()));
+check('I3 course button becomes Edit once reviewed', await p.locator('.course-feedback .post-review').innerText() === 'Edit your review');
+await shot(p, '10-posted-from-course-page');
+
+// Focus trap
+await p.locator('.course-feedback .post-review').click();
+await p.locator('.modal-actions .post-review').focus();
+await p.keyboard.press('Tab');
+check('I3 Tab wraps inside modal', await p.evaluate(() => document.activeElement.getAttribute('aria-label')) === 'Close');
+await p.keyboard.press('Escape'); await p.waitForTimeout(100);
+check('I3 focus returns to trigger', await p.evaluate(() => document.activeElement.className) === 'post-review');
+
+// ===== Preserved behaviour
+p = await fresh();
+await writeBtn(p).click(); await mSubmit(p).click();
+check('KEEP empty code error', await p.locator('.formerror').innerText() === 'Enter a course code.');
+await mInput(p).fill('   '); await mSubmit(p).click();
+check('KEEP whitespace code error', await p.locator('.formerror').innerText() === 'Enter a course code.');
+await mInput(p).fill('MATH204'); await mSubmit(p).click();
+check('KEEP rating required', await p.locator('.formerror').innerText() === 'Rating must be from 1 to 5.');
+check('KEEP rating options are integers 1-5', JSON.stringify(await mSelect(p).locator('option').evaluateAll(o => o.map(x => x.value))) === JSON.stringify(['', '1', '2', '3', '4', '5']));
+await mInput(p).fill('physics 101');
+check('KEEP unlisted course warned', /saved as “PHYSICS 101”/.test(await p.locator('.course-status').innerText()));
+await mSelect(p).selectOption('3'); await mSubmit(p).click(); await p.waitForTimeout(150);
+s = await saved(p);
+check('KEEP unlisted code accepted, comment optional', s[0].courseCode === 'PHYSICS 101' && s[0].comment === '' && s[0].rating === 3);
+check('KEEP unlisted shows card', await p.locator('.course-card', { hasText: 'PHYSICS 101' }).count() === 1);
+check('KEEP no-comment fallback', /No comment provided/.test(await p.locator('tbody tr').first().innerText()));
+await writeBtn(p).click(); await mInput(p).fill('physics101'); await mSelect(p).selectOption('3'); await mSubmit(p).click();
+check('NEW spacing duplicate on unlisted blocked', await p.locator('.formerror').count() === 1);
+p.dialogAnswer = true; await p.keyboard.press('Escape'); await p.waitForTimeout(100);
+
+const myRow = p.locator('tbody tr', { hasText: 'CSEN401' }).filter({ has: p.locator('.row-edit') });
+await myRow.locator('.row-edit').click();
+check('KEEP edit prefilled', await mInput(p).inputValue() === 'CSEN401' && await mSelect(p).inputValue() === '4');
+check('KEEP edit title', await p.locator('.modal h2').innerText() === 'Edit review');
+check('KEEP edit status not self-duplicate', /✓/.test(await p.locator('.course-status').innerText()));
+await mSelect(p).selectOption('2'); await mText(p).fill('Edited text');
+await mSubmit(p).click(); await p.waitForTimeout(150);
+s = await saved(p);
+check('KEEP edit saved in place', s.find(r => r.id === 'r4').rating === 2 && s.find(r => r.id === 'r4').comment === 'Edited text' && s.length === 10);
+check('KEEP edit confirmation', /Review updated/.test(await p.locator('.notice').innerText()));
+await p.locator('tbody tr', { hasText: 'CSEN401' }).filter({ has: p.locator('.row-edit') }).locator('.row-edit').click();
+await mInput(p).fill('CSEN701'); await mSubmit(p).click();
+check('KEEP cannot edit into a duplicate', await p.locator('.formerror').innerText() === 'You have already reviewed this course.');
+await p.keyboard.press('Escape'); await p.waitForTimeout(100);
+
+const othersEdit = await p.locator('tbody tr').filter({ hasText: 'Farida' }).locator('.row-edit').count();
+check('KEEP cannot edit others (table)', othersEdit === 0);
+await p.locator('.course-link', { hasText: 'CSEN701' }).first().click(); await p.waitForSelector('.course-hero');
+check('KEEP cannot edit others (course page)', await p.locator('.course-review', { hasText: 'Farida' }).locator('.row-edit').count() === 0);
+check('KEEP edit own (course page)', await p.locator('.course-review', { hasText: 'You' }).filter({ hasText: 'Edit your review' }).count() >= 1);
+check('KEEP teaching history both years', await p.locator('.teaching-entry h3').allInnerTexts().then(a => a.join() === '2025/26,2024/25'));
+check('KEEP disclaimer', await p.locator('.teaching-disclaimer').count() === 1);
+
+const url = p.url();
+await p.reload(); await p.waitForSelector('.course-hero');
+check('KEEP deep link survives reload', p.url() === url);
+const ctx2 = await browser.newContext(); const p2 = await ctx2.newPage();
+await p2.goto(URL + '#/courses/math204'); await p2.waitForSelector('.course-hero');
+check('KEEP shareable link, lowercase', await p2.locator('.course-hero h1').innerText() === 'Linear Algebra');
+await p2.goto(URL + '#/courses/NOPE1'); await p2.waitForTimeout(200);
+check('KEEP unknown course fallback', await p2.locator('.course-hero h1').innerText() === 'Course details not yet added');
+
+await p.getByRole('button', { name: 'Overview' }).click(); await p.waitForSelector('.page-head');
+await p.reload(); await p.waitForSelector('.page-head');
+check('KEEP localStorage persists', (await saved(p)).length === 10 && await p.locator('.metric').first().locator('strong').innerText() === '10');
+check('KEEP metrics/analytics/lookup present', await p.locator('.metric').count() === 3 && await p.locator('.donut').count() === 1 && await p.locator('.summary').count() === 1);
+p.dialogAnswer = false;
+await p.getByRole('button', { name: 'Reset demo' }).click(); await p.waitForTimeout(100);
+check('NEW reset cancel keeps data', (await saved(p)).length === 10);
+p.dialogAnswer = true;
+await p.getByRole('button', { name: 'Reset demo' }).click(); await p.waitForTimeout(150);
+s = await saved(p);
+check('KEEP reset restores seed', s.length === 9 && s.find(r => r.id === 'r4').rating === 4);
+check('KEEP reset notice', /Example data restored/.test(await p.locator('.notice').innerText()));
+check('notice in view after reset', await p.locator('.notice').evaluate(e => { const r = e.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight; }));
+
+// Old-format saved data still loads
+const p3 = await fresh();
+await p3.evaluate(k => localStorage.setItem(k, JSON.stringify([{ id: 'x', courseCode: 'csen 701', rating: 4, comment: '', owner: 'you', name: 'You', date: '2026-01-01' }])), KEY);
+await p3.reload(); await p3.waitForSelector('.page-head');
+await writeBtn(p3).click(); await mInput(p3).fill('CSEN701'); await mSelect(p3).selectOption('2'); await mSubmit(p3).click();
+check('old saved "csen 701" still counts as duplicate', await p3.locator('.formerror').count() === 1);
+
+// ===== Small screens
+for (const [w, h] of [[390, 844], [900, 800]]) {
+  const m = await fresh({ width: w, height: h });
+  await shot(m, `11-w${w}`);
+  const [sw, iw] = await m.evaluate(() => [document.documentElement.scrollWidth, innerWidth]);
+  check(`w${w} no page overflow`, sw === iw, [sw, iw]);
+  console.log(`      w${w} first card top / first row top:`, await m.locator('.course-card').first().evaluate(e => Math.round(e.getBoundingClientRect().top)), await m.locator('tbody tr').first().evaluate(e => Math.round(e.getBoundingClientRect().top)));
+  await writeBtn(m).click(); await m.waitForSelector('.modal');
+  await m.locator('.modal input').fill('crit');
+  await shot(m, `12-w${w}-modal`);
+}
+
+check('no page/console errors', errors.length === 0, errors);
+console.log(`\n${pass} passed, ${fail} failed`);
+await browser.close();
+process.exit(fail ? 1 : 0);

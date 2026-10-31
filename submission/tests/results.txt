@@ -1,0 +1,93 @@
+PASS  I1 all 5 catalog courses listed
+PASS  I1 cards visible without scrolling
+      first review row top (was 877): 639
+PASS  I1 card shows name/avg/count
+PASS  I1 marks courses you reviewed
+PASS  I1 search by course name (was 0)
+PASS  I1 search ignores fallback name text
+PASS  I1 lookup by name (was —)
+PASS  I1 lookup opens resolved course
+PASS  I1 card opens course page
+PASS  I2 real dates, not Recently  -> "6 Oct 2026"
+PASS  I2 Your reviews = only yours (was 4 with 2 others)  -> ["You","You"]
+PASS  I2 filter chip visible
+PASS  I2 search box not polluted
+PASS  I2 chip removal restores all
+PASS  I2 Browse clears owner filter (was sticky)
+PASS  I2 Apply removed, filtering live
+PASS  I2 rating filter live
+PASS  I2 empty state offers clear
+PASS  I2 clear filters
+PASS  I2 course page rating breakdown
+PASS  I2 course page real date
+PASS  I2 Back lands on list (was 721px down)  -> 0
+PASS  I2 filters survive Back
+PASS  Overview from course goes to top
+PASS  browser Back returns to course
+PASS  I3 focus starts on course field
+PASS  I3 duplicate warned live (space variant)
+PASS  I3 "CSEN 701" blocked (was saved)
+PASS  I3 nothing saved on failure
+PASS  I3 error clears on edit
+PASS  I3 switching with a draft asks first
+PASS  I3 switch opens your review
+PASS  I3 Esc closes clean form with no prompt
+PASS  I3 partial name suggests course
+PASS  I3 suggestion fills code
+PASS  I3 focus stays in dialog after suggestion
+PASS  I3 Tab from blank dialog area stays in dialog
+PASS  I3 resolved confirmation
+PASS  I3 full name resolves
+PASS  I3 draft preserved when discard refused
+PASS  MAIN create saves canonical code
+PASS  MAIN confirmation names course
+PASS  MAIN table updated
+PASS  MAIN card updated
+PASS  MAIN notice links to course
+PASS  stale notice cleared on navigation
+PASS  I3 course button prefills
+PASS  I3 focus skips to rating when prefilled
+PASS  I3 prefill alone is not a dirty draft
+PASS  I3 sidebar blank for another course
+PASS  I3 confirmation on course page (was 0)
+PASS  course page updates live
+PASS  I3 course button becomes Edit once reviewed
+PASS  I3 Tab wraps inside modal
+PASS  I3 focus returns to trigger
+PASS  KEEP empty code error
+PASS  KEEP whitespace code error
+PASS  KEEP rating required
+PASS  KEEP rating options are integers 1-5
+PASS  KEEP unlisted course warned
+PASS  KEEP unlisted code accepted, comment optional
+PASS  KEEP unlisted shows card
+PASS  KEEP no-comment fallback
+PASS  NEW spacing duplicate on unlisted blocked
+PASS  KEEP edit prefilled
+PASS  KEEP edit title
+PASS  KEEP edit status not self-duplicate
+PASS  KEEP edit saved in place
+PASS  KEEP edit confirmation
+PASS  KEEP cannot edit into a duplicate
+PASS  KEEP cannot edit others (table)
+PASS  KEEP cannot edit others (course page)
+PASS  KEEP edit own (course page)
+PASS  KEEP teaching history both years
+PASS  KEEP disclaimer
+PASS  KEEP deep link survives reload
+PASS  KEEP shareable link, lowercase
+PASS  KEEP unknown course fallback
+PASS  KEEP localStorage persists
+PASS  KEEP metrics/analytics/lookup present
+PASS  NEW reset cancel keeps data
+PASS  KEEP reset restores seed
+PASS  KEEP reset notice
+PASS  notice in view after reset
+PASS  old saved "csen 701" still counts as duplicate
+PASS  w390 no page overflow  -> [390,390]
+      w390 first card top / first row top: 376 1339
+PASS  w900 no page overflow  -> [900,900]
+      w900 first card top / first row top: 233 759
+PASS  no page/console errors  -> []
+
+88 passed, 0 failed
