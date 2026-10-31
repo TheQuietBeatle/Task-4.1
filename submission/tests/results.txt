@@ -83,6 +83,20 @@ PASS  NEW reset cancel keeps data
 PASS  KEEP reset restores seed
 PASS  KEEP reset notice
 PASS  notice in view after reset
+PASS  REMOVE only on your own rows
+PASS  REMOVE asks first, naming the course
+PASS  REMOVE cancel keeps review
+PASS  REMOVE deletes only that review
+PASS  REMOVE confirmation shown
+PASS  REMOVE focus stays on the page
+PASS  REMOVE updates card
+PASS  REMOVE persists after reload
+PASS  REMOVE frees the course for a new review
+PASS  REMOVE can review again
+PASS  REMOVE on course page only on your review
+PASS  REMOVE from course page
+PASS  REMOVE restores the Review button
+PASS  REMOVE undone by Reset demo
 PASS  old saved "csen 701" still counts as duplicate
 PASS  w390 no page overflow  -> [390,390]
       w390 first card top / first row top: 376 1339
@@ -90,4 +104,4 @@ PASS  w900 no page overflow  -> [900,900]
       w900 first card top / first row top: 233 759
 PASS  no page/console errors  -> []
 
-88 passed, 0 failed
+102 passed, 0 failed

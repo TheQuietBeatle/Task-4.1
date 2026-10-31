@@ -237,6 +237,38 @@ check('KEEP reset restores seed', s.length === 9 && s.find(r => r.id === 'r4').r
 check('KEEP reset notice', /Example data restored/.test(await p.locator('.notice').innerText()));
 check('notice in view after reset', await p.locator('.notice').evaluate(e => { const r = e.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight; }));
 
+// ===== Remove your own review
+const pr = await fresh();
+check('REMOVE only on your own rows', await pr.locator('tbody .row-remove').count() === 2 && await pr.locator('tbody tr').filter({ hasText: 'Farida' }).locator('.row-remove').count() === 0);
+const rmRow = () => pr.locator('tbody tr', { hasText: 'A challenging team project' });
+pr.dialogAnswer = false;
+await rmRow().locator('.row-remove').click(); await pr.waitForTimeout(100);
+check('REMOVE asks first, naming the course', /CSEN701/.test(pr.dialogs.at(-1)));
+check('REMOVE cancel keeps review', (await saved(pr)).length === 9 && await rmRow().count() === 1);
+pr.dialogAnswer = true;
+await rmRow().locator('.row-remove').click(); await pr.waitForTimeout(150);
+s = await saved(pr);
+check('REMOVE deletes only that review', s.length === 8 && !s.some(r => r.id === 'r1') && s.some(r => r.id === 'r2') && s.some(r => r.id === 'r6'));
+check('REMOVE confirmation shown', /Review removed for CSEN701/.test(await pr.locator('.notice').innerText()));
+check('REMOVE focus stays on the page', await pr.evaluate(() => document.activeElement.getAttribute('aria-label')) === 'Dismiss message');
+await shot(pr, '13-review-removed');
+check('REMOVE updates card', /2 reviews/.test(await pr.locator('.course-card', { hasText: 'CSEN701' }).innerText()) && await pr.locator('.course-card', { hasText: 'CSEN701' }).locator('em').count() === 0);
+await pr.reload(); await pr.waitForSelector('.page-head');
+check('REMOVE persists after reload', (await saved(pr)).length === 8);
+await writeBtn(pr).click(); await mInput(pr).fill('CSEN701');
+check('REMOVE frees the course for a new review', /✓/.test(await pr.locator('.course-status').innerText()));
+await mSelect(pr).selectOption('3'); await mSubmit(pr).click(); await pr.waitForTimeout(150);
+check('REMOVE can review again', (await saved(pr)).filter(r => r.owner === 'you' && r.courseCode === 'CSEN701').length === 1);
+await pr.goto(URL + '#/courses/CSEN401'); await pr.waitForSelector('.course-hero');
+check('REMOVE on course page only on your review', await pr.locator('.course-review .row-remove').count() === 1 && await pr.locator('.course-review', { hasText: 'Adam' }).locator('.row-remove').count() === 0);
+await shot(pr, '14-course-page-remove');
+await pr.locator('.course-review .row-remove').click(); await pr.waitForTimeout(150);
+check('REMOVE from course page', !(await saved(pr)).some(r => r.id === 'r4') && /Review removed for CSEN401/.test(await pr.locator('.notice').innerText()));
+check('REMOVE restores the Review button', await pr.locator('.course-feedback .post-review').innerText() === '＋ Review CSEN401');
+await pr.getByRole('button', { name: 'Overview' }).click(); await pr.waitForSelector('.page-head');
+await pr.getByRole('button', { name: 'Reset demo' }).click(); await pr.waitForTimeout(150);
+check('REMOVE undone by Reset demo', (await saved(pr)).length === 9 && (await saved(pr)).some(r => r.id === 'r4'));
+
 // Old-format saved data still loads
 const p3 = await fresh();
 await p3.evaluate(k => localStorage.setItem(k, JSON.stringify([{ id: 'x', courseCode: 'csen 701', rating: 4, comment: '', owner: 'you', name: 'You', date: '2026-01-01' }])), KEY);
