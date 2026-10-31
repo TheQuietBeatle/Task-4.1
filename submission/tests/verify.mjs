@@ -265,6 +265,17 @@ await shot(pr, '14-course-page-remove');
 await pr.locator('.course-review .row-remove').click(); await pr.waitForTimeout(150);
 check('REMOVE from course page', !(await saved(pr)).some(r => r.id === 'r4') && /Review removed for CSEN401/.test(await pr.locator('.notice').innerText()));
 check('REMOVE restores the Review button', await pr.locator('.course-feedback .post-review').innerText() === '＋ Review CSEN401');
+check('REMOVE header button hidden when you have no review', await pr.locator('.remove-review').count() === 0);
+await pr.goto(URL + '#/courses/MATH204'); await pr.waitForSelector('.course-hero');
+check('REMOVE header button hidden on a course you never reviewed', await pr.locator('.remove-review').count() === 0);
+await pr.goto(URL + '#/courses/CSEN701'); await pr.waitForSelector('.course-hero');
+pr.dialogAnswer = false;
+await pr.locator('.remove-review').click(); await pr.waitForTimeout(100);
+check('REMOVE header button asks first', /CSEN701/.test(pr.dialogs.at(-1)) && (await saved(pr)).some(r => r.owner === 'you' && r.courseCode === 'CSEN701'));
+pr.dialogAnswer = true;
+await pr.locator('.remove-review').click(); await pr.waitForTimeout(150);
+check('REMOVE header button removes only your review', !(await saved(pr)).some(r => r.owner === 'you' && r.courseCode === 'CSEN701') && (await saved(pr)).filter(r => r.courseCode === 'CSEN701').length === 2);
+check('REMOVE header button confirms and stays on page', /Review removed for CSEN701/.test(await pr.locator('.notice').innerText()) && pr.url().endsWith('#/courses/CSEN701'));
 await pr.getByRole('button', { name: 'Overview' }).click(); await pr.waitForSelector('.page-head');
 await pr.getByRole('button', { name: 'Reset demo' }).click(); await pr.waitForTimeout(150);
 check('REMOVE undone by Reset demo', (await saved(pr)).length === 9 && (await saved(pr)).some(r => r.id === 'r4'));
@@ -287,6 +298,13 @@ for (const [w, h] of [[390, 844], [900, 800]]) {
   await m.locator('.modal input').fill('crit');
   await shot(m, `12-w${w}-modal`);
 }
+
+const phone = await fresh({ width: 390, height: 844 });
+await phone.goto(URL + '#/courses/CSEN401'); await phone.waitForSelector('.remove-review');
+await phone.locator('.remove-review').scrollIntoViewIfNeeded();
+await shot(phone, '15-w390-course-remove');
+const [psw, piw] = await phone.evaluate(() => [document.documentElement.scrollWidth, innerWidth]);
+check('REMOVE header button fits a phone', psw === piw, [psw, piw]);
 
 check('no page/console errors', errors.length === 0, errors);
 console.log(`\n${pass} passed, ${fail} failed`);

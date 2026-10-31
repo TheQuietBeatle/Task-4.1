@@ -96,12 +96,18 @@ PASS  REMOVE can review again
 PASS  REMOVE on course page only on your review
 PASS  REMOVE from course page
 PASS  REMOVE restores the Review button
+PASS  REMOVE header button hidden when you have no review
+PASS  REMOVE header button hidden on a course you never reviewed
+PASS  REMOVE header button asks first
+PASS  REMOVE header button removes only your review
+PASS  REMOVE header button confirms and stays on page
 PASS  REMOVE undone by Reset demo
 PASS  old saved "csen 701" still counts as duplicate
 PASS  w390 no page overflow  -> [390,390]
       w390 first card top / first row top: 376 1339
 PASS  w900 no page overflow  -> [900,900]
       w900 first card top / first row top: 233 759
+PASS  REMOVE header button fits a phone  -> [390,390]
 PASS  no page/console errors  -> []
 
-102 passed, 0 failed
+108 passed, 0 failed

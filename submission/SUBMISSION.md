@@ -72,7 +72,7 @@
 
 ## Testing
 
-`tests/verify.mjs` drives the running app in headless Chrome. **102 checks pass, 0 fail** (`tests/results.txt`), and the production build succeeds. The checks cover:
+`tests/verify.mjs` drives the running app in headless Chrome. **108 checks pass, 0 fail** (`tests/results.txt`), and the production build succeeds. The checks cover:
 
 - **Validation:** course code required, whole-number ratings 1–5, optional comment, and one review per course, including when editing.
 - **Ownership:** you can only edit or remove your own reviews, in both the table and the course page.
@@ -87,7 +87,7 @@ The script needs `playwright-core`, an installed Chrome and the app running on p
 ## Other behaviour changes
 - "Apply" is removed, because filtering was already live.
 - Reset demo now asks for confirmation, and still restores the example data.
-- New feature: you can remove your own reviews, after a confirmation (`after/13-review-removed.png`, `after/14-course-page-remove.png`). Removing a review frees that course for a new one.
+- New feature: you can remove your own reviews, after a confirmation (`after/13-review-removed.png`, `after/14-course-page-remove.png`). It is available in the review table and on the course page, where a "Remove your review" button sits beside "Edit your review". Removing a review frees that course for a new one.
 
 ## Known limitations
 - The donut chart's segments are still hardcoded in CSS and don't reflect the data.
